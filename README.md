@@ -1,8 +1,5 @@
 # CBA Banking Data Platform — Project Overview
 
-Paste this section near the top of each repo's README, adjusting the
-"You are here" line to match.
-
 ---
 
 ## How this fits with the rest of the project
