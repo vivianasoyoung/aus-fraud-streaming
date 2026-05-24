@@ -1,22 +1,20 @@
 CREATE SCHEMA IF NOT EXISTS fraud;
 
 CREATE TABLE IF NOT EXISTS fraud.flagged_transactions (
-    id                  SERIAL PRIMARY KEY,
-    transaction_id      VARCHAR(36),
-    account_id          VARCHAR(20),
-    amount              NUMERIC(12,2),
+    id                  BIGSERIAL PRIMARY KEY,
+    transaction_id      VARCHAR(36)  NOT NULL UNIQUE,
+    account_id          VARCHAR(20)  NOT NULL,
+    amount              NUMERIC(12, 2) NOT NULL CHECK (amount >= 0),
     merchant_category   VARCHAR(50),
     channel             VARCHAR(20),
-    fraud_reason        TEXT,
-    risk_score          INTEGER,
-    flagged_at          TIMESTAMP DEFAULT NOW()
+    fraud_reasons       TEXT[]       NOT NULL,
+    risk_score          INTEGER      NOT NULL CHECK (risk_score BETWEEN 0 AND 100),
+    event_time          TIMESTAMPTZ  NOT NULL,
+    processed_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS fraud.transaction_velocity (
-    account_id          VARCHAR(20),
-    window_start        TIMESTAMP,
-    window_end          TIMESTAMP,
-    transaction_count   INTEGER,
-    total_amount        NUMERIC(12,2),
-    PRIMARY KEY (account_id, window_start)
-);
+CREATE INDEX IF NOT EXISTS idx_flagged_account_time
+    ON fraud.flagged_transactions (account_id, event_time DESC);
+
+CREATE INDEX IF NOT EXISTS idx_flagged_processed_at
+    ON fraud.flagged_transactions (processed_at DESC);
