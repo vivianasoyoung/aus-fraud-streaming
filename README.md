@@ -1,7 +1,5 @@
 # CBA Banking Data Platform — Project Overview
 
----
-
 ## How this fits with the rest of the project
 
 This repo is one of four that together make up an end-to-end banking data
