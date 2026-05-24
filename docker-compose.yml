@@ -33,11 +33,11 @@ services:
       KAFKA_CLUSTERS_0_NAME: cba-fraud
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
 
-  postgres:
+ postgres:
     image: postgres:15
     environment:
       POSTGRES_USER: fraud
-      POSTGRES_PASSWORD: fraud
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?PG_PASSWORD must be set in .env}
       POSTGRES_DB: fraud_detection
     ports:
       - "5433:5432"
@@ -49,5 +49,36 @@ services:
       interval: 5s
       retries: 5
 
+producer:
+    build:
+      context: .
+      dockerfile: Dockerfile.producer
+    depends_on:
+      kafka:
+        condition: service_started
+    environment:
+      KAFKA_BROKER: kafka:29092
+      KAFKA_TOPIC: transactions
+    restart: unless-stopped
+
+  consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile.consumer
+    depends_on:
+      kafka:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: kafka:29092
+      KAFKA_TOPIC: transactions
+      KAFKA_DLQ_TOPIC: transactions.dlq
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DB: fraud_detection
+      PG_USER: fraud
+      PG_PASSWORD: ${PG_PASSWORD:?PG_PASSWORD must be set in .env}
+    restart: unless-stopped
 volumes:
   postgres_fraud_data:
