@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    env:
+      PG_PASSWORD: dummy_for_import_only
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install ruff pytest
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Import-check (catches syntax errors without Kafka/Postgres)
+        run: |
+          python -c "import sys; sys.path.insert(0, '.'); import producer.transaction_producer"
+          python -c "import sys; sys.path.insert(0, '.'); import consumer.fraud_consumer"
+
+      - name: Unit tests
+        run: pytest -v
