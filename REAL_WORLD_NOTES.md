@@ -1,6 +1,6 @@
 # What I'd do differently in production
 
-This is a demo. Real CBA-scale fraud detection would differ in several
+This is a demo. Real bank-scale fraud detection would differ in several
 important ways. Listing them here both as honesty and as a starting point
 for the inevitable "what would you change?" interview question.
 
