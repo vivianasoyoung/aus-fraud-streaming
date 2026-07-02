@@ -37,17 +37,24 @@ for the inevitable "what would you change?" interview question.
   pipeline.
 
 ## Observability
-- **Demo:** stdout logging.
-- **Production:** Structured JSON logs → OpenSearch, metrics (lag,
-  rule-firing rates, score distribution) → Prometheus / Grafana,
-  per-message tracing → OpenTelemetry. Alerts on lag > 30s and on rule
-  firing rates drifting >2σ from baseline.
+- **Built:** Prometheus metrics on the consumer (throughput by outcome,
+  fraud-flag rate, risk score percentiles, DLQ rate by reason, p99
+  processing latency, consumer lag per partition), scraped every 5s and
+  visualized in a provisioned Grafana dashboard — `docker compose up` and
+  it's live at `localhost:3000`, no manual setup.
+- **Still not production-grade:** logs are stdout only, not shipped to
+  OpenSearch/structured log aggregation. No per-message distributed tracing
+  (OpenTelemetry). No alerting wired up — the metrics exist to alert on
+  (e.g. lag, rule-firing drift >2σ from baseline) but nothing pages anyone
+  yet; that's a Prometheus Alertmanager or Grafana alerting rule away, just
+  not built here.
 
 ## Backpressure & SLAs
 - **Demo:** Single consumer, no SLA.
 - **Production:** Multiple consumer instances in the group, partition count
   sized for peak throughput, p99 latency budget (e.g. "score within 200ms
-  of card swipe").
+  of card swipe"). The p99 processing latency panel on the dashboard is a
+  start — it tells you the number, it doesn't enforce a budget.
 
 ## Compliance
 - **Demo:** No PII handling.
