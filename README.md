@@ -31,10 +31,12 @@ Fraud Detection Consumer (Python, containerised)
    ├── Rules engine (5 scored rules)
    ├── Dead-letter queue for malformed messages
    ├── Manual offset commits after successful DB write
-   └── Connection pool
+   ├── Connection pool
+   └── Prometheus metrics on :8000/metrics
         │
-        ▼
-PostgreSQL — fraud.flagged_transactions (UNIQUE on transaction_id, ON CONFLICT DO NOTHING)
+        ├──► PostgreSQL — fraud.flagged_transactions (UNIQUE on transaction_id, ON CONFLICT DO NOTHING)
+        │
+        └──► Prometheus (scrapes every 5s) ──► Grafana (provisioned dashboard)
 ```
 
 ## Tech Stack
@@ -45,20 +47,23 @@ PostgreSQL — fraud.flagged_transactions (UNIQUE on transaction_id, ON CONFLICT
 | Stream processing | Python (kafka-python, Pydantic) |
 | Storage | PostgreSQL 15 |
 | Orchestration | Docker + Docker Compose |
-| Monitoring | Kafka UI |
+| Monitoring | Kafka UI, Prometheus, Grafana |
 
 ## Quick Start
 
 ```bash
 cp .env.example .env        # set PG_PASSWORD
-docker compose up -d        # boots Kafka, Postgres, Kafka UI, producer, consumer
+docker compose up -d        # boots Kafka, Postgres, Kafka UI, producer, consumer, Prometheus, Grafana
 docker compose logs -f consumer
 ```
 
-| Service | URL |
-|---|---|
-| Kafka UI | http://localhost:8090 |
-| PostgreSQL | localhost:5433 |
+| Service | URL | Notes |
+|---|---|---|
+| Kafka UI | http://localhost:8090 | |
+| Grafana | http://localhost:3000 | Anonymous viewer access enabled — "Fraud Consumer" dashboard is pre-provisioned, no setup needed. Login `admin`/`admin` for edit access. |
+| Prometheus | http://localhost:9090 | Raw metrics + query UI |
+| Consumer metrics | http://localhost:8000/metrics | Raw Prometheus exposition format |
+| PostgreSQL | localhost:5433 | |
 
 Query flagged transactions:
 
@@ -80,6 +85,28 @@ docker compose exec postgres psql -U fraud -d fraud_detection \
 
 Score capped at 100. Rules are defined as data (`RULES = [...]`) — one place to read or edit them.
 
+## Observability
+
+The consumer exposes Prometheus metrics, scraped every 5 seconds, visualized
+in a Grafana dashboard that's provisioned automatically on startup — no
+manual dashboard setup required.
+
+| Metric | What it shows |
+|---|---|
+| `fraud_consumer_messages_processed_total{outcome}` | Throughput, split by ok / flagged / db_error_retry |
+| `fraud_consumer_dlq_messages_total{reason}` | Dead-letter rate, split by validation / unhandled |
+| `fraud_consumer_risk_score` | Distribution (p50/p95) of risk scores on flagged transactions |
+| `fraud_consumer_processing_seconds` | Per-message processing latency (p99 on the dashboard) |
+| `fraud_consumer_lag_messages{partition}` | Consumer lag, recomputed every 20 messages |
+
+The dashboard has 6 panels: throughput by outcome, fraud flag rate, consumer
+lag per partition, DLQ rate by reason, risk score percentiles, and p99
+processing latency. Suggested alert threshold for consumer lag (not wired to
+a pager here, but this is what a real Alertmanager rule would use): lag
+sustained above ~100 messages for 5 minutes at this pipeline's throughput
+corresponds to roughly the ">30s" threshold mentioned in
+[`REAL_WORLD_NOTES.md`](./REAL_WORLD_NOTES.md).
+
 ## Robustness
 
 - **Idempotent inserts** — `UNIQUE(transaction_id)` + `ON CONFLICT DO NOTHING`; replays are safe
@@ -97,6 +124,10 @@ aus-fraud-streaming/
 ├── producer/transaction_producer.py
 ├── consumer/fraud_consumer.py
 ├── docker/init.sql
+├── docker/prometheus.yml
+├── docker/grafana/provisioning/datasources/prometheus.yml
+├── docker/grafana/provisioning/dashboards/dashboard.yml
+├── docker/grafana/dashboards/fraud-consumer.json
 ├── Dockerfile.producer
 ├── Dockerfile.consumer
 ├── requirements.txt
