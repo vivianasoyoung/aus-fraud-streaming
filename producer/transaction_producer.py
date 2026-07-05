@@ -71,9 +71,8 @@ def build_producer() -> KafkaProducer:
         bootstrap_servers=KAFKA_BROKER,
         value_serializer=lambda v: json.dumps(v).encode("utf-8"),
         key_serializer=lambda k: k.encode("utf-8") if k else None,
-        acks="all",                # don't ack until all in-sync replicas have it
-        enable_idempotence=True,   # exactly-once semantics on the producer side
-        retries=5,
+        acks="all",     # don't ack until all in-sync replicas have it
+        retries=5,      # at-least-once; kafka-python has no idempotent producer support
     )
 
 
