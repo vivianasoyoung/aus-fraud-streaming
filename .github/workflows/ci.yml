@@ -33,3 +33,35 @@ jobs:
 
       - name: Unit tests
         run: pytest -v
+
+  smoke-test:
+    needs: lint-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Boot the full stack
+        run: |
+          echo "PG_PASSWORD=ci_smoke_test_password" > .env
+          docker compose up -d --build
+
+      - name: Wait for real message flow end-to-end
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf localhost:8000/metrics 2>/dev/null | grep -qE 'fraud_consumer_messages_processed_total\{outcome="ok"\} [1-9]'; then
+              echo "Pipeline is live — consumer is processing real messages:"
+              curl -sf localhost:8000/metrics | grep fraud_consumer_messages_processed_total
+              exit 0
+            fi
+            echo "Waiting for message flow... ($i/30)"
+            sleep 5
+          done
+          echo "No messages processed after 150s — pipeline did not come up correctly"
+          docker compose ps
+          docker compose logs
+          exit 1
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
